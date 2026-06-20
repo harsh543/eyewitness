@@ -116,12 +116,28 @@ Tables (all append-only, every row carries `run_id` + `model_version`):
 - `fault_analyses` — VLM verdict + human overrides as separate rows
 - `monitoring_events` — per-stage latency / cost / tokens / fallback metrics
 
-## Demo clip
+## Demo clips & test footage
 
-Download a dashcam near-miss video and name it `clip.mp4`:
+The clips below were used to develop and demo Eyewitness. Each was trimmed to the
+incident window with `yt-dlp --download-sections` so the impact detector locks onto
+the right vehicles. Third-party dashcam footage — used here for research/demo only.
+
+| Local file | Source video | Window | Notes |
+|------------|--------------|--------|-------|
+| `clip_uk2.mp4` | [Idiot UK Drivers Exposed #5](https://www.youtube.com/watch?v=SyESL5NNgAg) | `6:04–6:12` | ⭐ **hero clip** — verdict: Vehicle #1, 72%, SEVERE |
+| `clip_rei.mp4` | [Child's Near-Miss at Intersection](https://www.youtube.com/watch?v=REqJBtkEWkA) | `8:34–8:47` | busy/slow scene — weak verdict |
+| `clip_uk.mp4` | [Idiot UK Drivers Exposed #5](https://www.youtube.com/watch?v=SyESL5NNgAg) | `8:34–8:47` | alternate segment |
+| _(n/a)_ | [JRS Cars — Close Calls Compilation](https://www.youtube.com/watch?v=PvEpACLg-Zk) | — | video is only 4:25 — chosen window out of range |
+| _(browse)_ | [Ultimate Near Miss Playlist](https://www.youtube.com/playlist?list=PLtIavcna3Ct3GYBEVN7NyDYktBSVg8Of7) | — | source playlist for more clips |
+
+Fetch a clip yourself (trim to the incident — pick a window with two clearly
+separating vehicles):
 
 ```bash
-yt-dlp -o clip.mp4 "https://www.youtube.com/watch?v=<near-miss-video-id>"
+# example: the hero clip
+yt-dlp -f "mp4[height<=720]/mp4/best" \
+  --download-sections "*6:04-6:12" --force-keyframes-at-cuts \
+  -o clip_uk2.mp4 "https://www.youtube.com/watch?v=SyESL5NNgAg"
 ```
 
 ## Run
