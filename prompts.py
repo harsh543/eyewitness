@@ -2,6 +2,13 @@
 
 import json
 
+
+def _json_native(o):
+    """Convert NumPy scalars to native Python types for json.dumps."""
+    if hasattr(o, "item"):
+        return o.item()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
 FAULT_ANALYSIS_SYSTEM = """\
 You are an expert traffic-accident analyst with forensic vision capabilities.
 You will receive structured CV facts, physics-based avoidability results,
@@ -75,8 +82,8 @@ def build_user_message(
     )
 
     return FAULT_ANALYSIS_USER_TEMPLATE.format(
-        facts_json        = json.dumps(facts_payload,       indent=2),
-        avoidability_json = json.dumps(avoidability_payload, indent=2),
+        facts_json        = json.dumps(facts_payload,       indent=2, default=_json_native),
+        avoidability_json = json.dumps(avoidability_payload, indent=2, default=_json_native),
     )
 
 

@@ -13,6 +13,14 @@ import config
 from schemas import FaultHypothesis, KeyFrame, VehicleFact, AvoidabilityResult
 
 
+def _json_native(o):
+    """json.dumps default: convert NumPy scalars (float32, bool_, int64, …) to
+    native Python types. Without this, pipeline values silently fail to serialize."""
+    if hasattr(o, "item"):
+        return o.item()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
 class ButterbaseClient:
     """
     Locked endpoints (Option A):
@@ -32,7 +40,7 @@ class ButterbaseClient:
             print(f"[BB] BUTTERBASE_API_KEY not set — skipping {table}")
             return None
         try:
-            data = json.dumps(payload).encode()
+            data = json.dumps(payload, default=_json_native).encode()
             req  = urllib.request.Request(
                 f"{self._base}/{table}",
                 data    = data,
@@ -51,9 +59,10 @@ class ButterbaseClient:
     # ── claims ─────────────────────────────────────────────────────────────────
 
     def insert_claim(self, run_id: str, model_version: str, clip_filename: str) -> bool:
+        # _persist runs only after CV + VLM stages succeed, so the claim is complete.
         return self._post("claims", {
             "run_id": run_id, "model_version": model_version,
-            "clip_filename": clip_filename, "status": "pending",
+            "clip_filename": clip_filename, "status": "complete",
         }) is not None
 
     # ── facts ──────────────────────────────────────────────────────────────────
@@ -116,7 +125,9 @@ class ButterbaseClient:
             "fault_vehicle_id":     h.fault_vehicle_id,
             "fault_reason":         h.fault_reason,
             "confidence":           h.confidence,
-            "contributing_factors": h.contributing_factors,
+            # JSONB column rejects a native JSON array via this REST API — it must
+            # receive a JSON-encoded STRING. (Verified: native array → HTTP 400.)
+            "contributing_factors": json.dumps(list(h.contributing_factors)),
             "severity":             h.severity,
             "fallback_used":        h.fallback_used,
             "override_reason":      override_reason,

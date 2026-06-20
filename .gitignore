@@ -10,3 +10,4 @@ __pycache__/
 *.avi
 *.mov
 .DS_Store
+*.part

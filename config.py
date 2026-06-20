@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 # ── model ──────────────────────────────────────────────────────────────────────
-YOLO_MODEL    = os.getenv("YOLO_MODEL",   "yolo11x.pt")
+YOLO_MODEL    = os.getenv("YOLO_MODEL",   "yolo11n.pt")   # CPU-friendly default; override to yolo11x.pt on GPU
 CLAUDE_MODEL  = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 MODEL_VERSION = "eyewitness-v1"
 

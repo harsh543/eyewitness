@@ -1,13 +1,73 @@
-# Eyewitness — AI Accident Analyst
+# 🎥 EYEWITNESS — Physics-First Collision Fault Analysis
 
-Beta Hacks 2026 · 90-second demo · isolated from PlanGEN
+> **Fault isn't who hit whom — it's who could have stopped and didn't.**
+> Eyewitness reconstructs who is at fault in a vehicle collision from ordinary dashcam
+> video by separating **deterministic facts** from **AI judgment**. Built by **Team Black Box**
+> for Beta Hack · Physical AI 2026.
+
+## 🔗 Live URLs
+
+| What | URL |
+|------|-----|
+| 🟣 **Live dashboard** (Butterbase-hosted) | https://eyewitness.butterbase.dev |
+| 🟢 **Interactive analyzer** (Render) | https://eyewitness-pc9a.onrender.com |
+| 🎬 **Demo video** (Loom) | https://www.loom.com/share/635c6d482f734a0daa581d3fbd3add52 |
+| 📊 **Pitch deck** (Gamma) | https://gamma.app/docs/EYEWITNESS-qomnwxmoib6txbh |
+| 🧠 **Data API** (Butterbase) | `https://api.butterbase.ai/v1/app_46yxrt8czo59` |
+| ⚙️ **Aggregation function** | `…/v1/app_46yxrt8czo59/fn/get_runs` |
+| 💻 **Source** | https://github.com/harsh543/eyewitness |
+
+## 🏗️ Architecture — Render (compute) + Butterbase (backend)
+
+The whole design flows from one decision: **YOLO11 + OpenCV + PyTorch is heavy Python that
+can't run on Butterbase functions (TypeScript/Deno).** So **compute lives on Render**, and
+**Butterbase owns data + serving.** The two planes are fully decoupled — the dashboard keeps
+serving every past case even if compute is down, and your laptop can run the *same* pipeline
+into the *same* backend.
+
+```
+                        ┌──────────────────────────────────────────┐
+                        │              YOU / JUDGES                  │
+                        └───────┬───────────────────────┬───────────┘
+                                │ upload video          │ view results
+                                ▼                       ▼
+      ╔═════════════════════════════════════╗   ╔══════════════════════════════╗
+      ║          RENDER  (compute)          ║   ║      BUTTERBASE  (backend)    ║
+      ║  ───────────────────────────────    ║   ║  ──────────────────────────   ║
+      ║  Docker · 2 GB · Python             ║   ║  • Postgres DB (6 tables)     ║
+      ║                                     ║   ║  • get_runs serverless fn     ║
+      ║   Gradio UI (app.py)                ║   ║  • Static dashboard hosting   ║
+      ║      │                              ║   ║  • Auto REST API              ║
+      ║      ▼                              ║   ╚══════════════════════════════╝
+      ║   analyze_clip()                    ║          ▲                  │
+      ║   ① YOLO11 + ByteTrack  (CV facts)  ║          │ writes           │ reads
+      ║   ② avoidability physics            ║          │ (REST + API key) │ (get_runs)
+      ║   ③ Claude VLM verdict ──────────┐  ║          │                  │
+      ║                                  │  ║──────────┘                  │
+      ╚══════════════════════════════════╪══╝                            │
+                                         │                                ▼
+                                ┌────────▼─────────┐         ┌────────────────────────┐
+                                │  ANTHROPIC API   │         │  eyewitness.butterbase  │
+                                │  (Claude verdict)│         │  .dev  — live dashboard │
+                                └──────────────────┘         └────────────────────────┘
+
+  end-to-end:  upload ─▶ ①YOLO facts ─▶ ②physics ─▶ ③Claude ─▶ write to Butterbase
+                                                          dashboard ◀─ get_runs() ◀─┘
+```
+
+| Plane | Runs on | Owns |
+|-------|---------|------|
+| **Compute** | Render (Docker, 2 GB) | YOLO tracking, avoidability physics, Claude call, writes to Butterbase |
+| **Backend** | Butterbase | Postgres (6 append-only tables), `get_runs` function, hosted dashboard, REST API |
+| **LLM** | Anthropic | Claude `claude-sonnet-4-6` verdict (retry + fallback, never blocks) |
 
 ## What it does
 
-Upload a dashcam clip → YOLO11x tracks vehicles → extracts per-vehicle speed,
-heading, TTC, and braking facts → Claude analyses 4 keyframes → fault hypothesis
-in structured JSON → all evidence appended to Butterbase → human can override
-without overwriting the original VLM analysis.
+Upload a dashcam clip → **① YOLO11 + ByteTrack** track vehicles (speed, heading, TTC, braking)
+→ **② Field-of-Safe-Motion** physics computes whether each vehicle *could have stopped*
+(the fault counterfactual) → **③ Claude** corroborates the verdict with confidence + severity
+→ all evidence is appended to a **Butterbase** trail with full chain of custody → humans can
+override without ever erasing the original AI verdict.
 
 ## Stack
 
@@ -16,8 +76,9 @@ without overwriting the original VLM analysis.
 | Tracking | YOLO11x via ultralytics |
 | CV facts | OpenCV + NumPy (two-pass, memory-safe) |
 | VLM | Claude claude-sonnet-4-6 via Anthropic SDK |
-| Persistence | Butterbase REST (append-only, 4 tables) |
-| UI | Gradio Blocks |
+| Persistence | Butterbase REST (append-only, 6 tables) |
+| UI | Gradio Blocks (file upload + paste-a-URL via yt-dlp) |
+| Deploy | Docker → Render (Standard, 2 GB) |
 
 ## Setup
 
@@ -36,7 +97,7 @@ export BUTTERBASE_API_KEY=<your Butterbase service key>   # get from butterbase.
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `YOLO_MODEL` | `yolo11x.pt` | Switch to `yolo11n.pt` for faster CPU inference |
+| `YOLO_MODEL` | `yolo11n.pt` | CPU-friendly default; switch to `yolo11x.pt` on GPU for accuracy |
 | `CLAUDE_MODEL` | `claude-sonnet-4-6` | Override VLM model |
 | `GRADIO_PORT` | `7860` | UI port |
 | `GRADIO_SHARE` | `false` | Set `true` for a public Gradio link |
@@ -47,11 +108,13 @@ export BUTTERBASE_API_KEY=<your Butterbase service key>   # get from butterbase.
 App: `eyewitness` (`app_46yxrt8czo59`)  
 API: `https://api.butterbase.ai/v1/app_46yxrt8czo59`
 
-Tables (all append-only):
+Tables (all append-only, every row carries `run_id` + `model_version`):
 - `claims` — one row per analysis run
-- `facts` — one row per tracked vehicle
-- `frames` — 4 keyframe rows per run (base64 JPEG inline)
-- `fault_analyses` — VLM hypothesis + human overrides as separate rows
+- `facts` — one row per tracked vehicle (CV kinematics)
+- `avoidability` — one row per vehicle (Field-of-Safe-Motion physics)
+- `frames` — 4 keyframe rows per run
+- `fault_analyses` — VLM verdict + human overrides as separate rows
+- `monitoring_events` — per-stage latency / cost / tokens / fallback metrics
 
 ## Demo clip
 
