@@ -194,4 +194,10 @@ with gr.Blocks(theme=gr.themes.Monochrome(), title="Eyewitness") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(server_port=config.GRADIO_PORT, share=config.GRADIO_SHARE)
+    # server_name 0.0.0.0 is REQUIRED on Render/containers (default localhost
+    # is unreachable from outside the container, failing health checks).
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=config.GRADIO_PORT,
+        share=config.GRADIO_SHARE,
+    )

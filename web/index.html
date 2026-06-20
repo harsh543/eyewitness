@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EYEWITNESS · Forensic Collision Analysis</title>
+<meta name="description" content="Eyewitness reconstructs collision fault from deterministic computer-vision physics and an AI vision model." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --base:        #0B0F14;
+    --panel:       #141A22;
+    --panel-2:     #1A222C;
+    --line:        #243038;
+    --line-bright: #33414d;
+    --text:        #E6E9EC;
+    --dim:         #7C8A99;
+    --cyan:        #41E0D0;
+    --amber:       #FFB43D;
+    --red:         #FF4D5E;
+    --green:       #4ADE80;
+
+    --disp: "Saira Condensed", "Arial Narrow", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --body: "Inter", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #10242a 0%, transparent 55%),
+      var(--base);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+    z-index: 9999;
+    mix-blend-mode: overlay;
+  }
+
+  .eyebrow {
+    font-family: var(--disp);
+    text-transform: uppercase;
+    letter-spacing: 0.32em;
+    font-weight: 600;
+    color: var(--dim);
+    font-size: 0.72rem;
+  }
+
+  /* ── top bar ─────────────────────────────────────────────── */
+  header.topbar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 1.2rem;
+    padding: 0.9rem clamp(1rem, 4vw, 3rem);
+    background: rgba(11,15,20,0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .wordmark {
+    font-family: var(--disp);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .wordmark .dot { color: var(--cyan); }
+  .topbar .sub {
+    font-family: var(--disp);
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    font-size: 0.62rem;
+    color: var(--dim);
+    margin-top: 3px;
+  }
+  .topbar .spacer { flex: 1; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--dim);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 0.4rem 0.7rem;
+    background: var(--panel);
+  }
+  .pill .led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  .pill.err .led { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  button.refresh {
+    font-family: var(--disp);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--base);
+    background: var(--cyan);
+    border: none;
+    border-radius: 2px;
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  button.refresh:hover { filter: brightness(1.12); }
+  button.refresh:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  button.refresh:disabled { opacity: 0.5; cursor: wait; }
+
+  /* ── intro ───────────────────────────────────────────────── */
+  .intro {
+    padding: clamp(2rem, 6vw, 4rem) clamp(1rem, 4vw, 3rem) 1rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .intro h1 {
+    font-family: var(--disp);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    font-size: clamp(2rem, 6vw, 3.6rem);
+    line-height: 0.98;
+    margin: 0.5rem 0 0.8rem;
+  }
+  .intro h1 .accent { color: var(--cyan); }
+  .intro p.lede { max-width: 56ch; color: var(--dim); font-size: 1.02rem; }
+  .intro p.lede strong { color: var(--text); font-weight: 600; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 1.2rem;
+    margin-top: 1.6rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--dim);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .legend i { width: 18px; height: 3px; display: inline-block; }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem clamp(1rem, 4vw, 3rem) 5rem;
+    display: flex; flex-direction: column; gap: 2.4rem;
+  }
+
+  /* ── case panel ──────────────────────────────────────────── */
+  .case {
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel) 0%, #11161d 100%);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .case-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem 2rem;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .case-meta { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: baseline; }
+  .case-meta .field { display: flex; flex-direction: column; gap: 2px; }
+  .case-meta .k {
+    font-family: var(--disp); text-transform: uppercase;
+    letter-spacing: 0.18em; font-size: 0.6rem; color: var(--dim);
+  }
+  .case-meta .v { font-family: var(--mono); font-size: 0.86rem; color: var(--text); }
+
+  .verdict-tag { align-self: start; justify-self: end; text-align: right;
+    font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.08em; }
+  .verdict-tag .label { font-size: 0.62rem; letter-spacing: 0.22em; color: var(--dim); }
+  .verdict-tag .val { font-size: 1.5rem; font-weight: 700; line-height: 1.05; margin-top: 2px; }
+  .verdict-tag .meta { font-family: var(--mono); font-size: 0.74rem; color: var(--dim); margin-top: 3px; }
+
+  .sev-severe   .verdict-tag .val, .sev-critical .verdict-tag .val { color: var(--red); }
+  .sev-moderate .verdict-tag .val { color: var(--amber); }
+  .sev-minor    .verdict-tag .val { color: var(--green); }
+  .sev-unknown  .verdict-tag .val { color: var(--dim); }
+
+  section.evi { padding: 1.3rem 1.4rem; border-bottom: 1px solid var(--line); }
+  section.evi:last-child { border-bottom: none; }
+  .sec-label {
+    display: flex; align-items: center; gap: 0.7rem;
+    font-family: var(--disp); text-transform: uppercase;
+    letter-spacing: 0.26em; font-size: 0.72rem; color: var(--cyan);
+    margin-bottom: 1.1rem;
+  }
+  .sec-label .num {
+    font-family: var(--mono); color: var(--dim); font-size: 0.7rem;
+    border: 1px solid var(--line); border-radius: 2px; padding: 1px 6px;
+  }
+  .sec-label .rule { flex: 1; height: 1px; background: var(--line); }
+
+  /* ── facts table ─────────────────────────────────────────── */
+  table.facts { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.84rem; }
+  table.facts th {
+    font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.14em;
+    font-size: 0.64rem; font-weight: 600; color: var(--dim);
+    text-align: right; padding: 0.4rem 0.8rem; border-bottom: 1px solid var(--line);
+  }
+  table.facts th:first-child, table.facts td:first-child { text-align: left; }
+  table.facts td { padding: 0.55rem 0.8rem; border-bottom: 1px solid rgba(36,48,56,0.5); color: var(--text); text-align: right; }
+  table.facts tr:last-child td { border-bottom: none; }
+  table.facts .vid { color: var(--cyan); font-weight: 600; }
+  .chip-bool { font-family: var(--disp); letter-spacing: 0.08em; font-size: 0.72rem; }
+  .chip-bool.no { color: var(--red); }
+  .chip-bool.yes { color: var(--green); }
+
+  /* ── avoidability gauges (SIGNATURE) ─────────────────────── */
+  .gauge { margin-bottom: 1.5rem; }
+  .gauge:last-child { margin-bottom: 0; }
+  .gauge-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.55rem; gap: 1rem; }
+  .gauge-head .who { font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.95rem; }
+  .gauge-head .who b { color: var(--cyan); }
+  .gauge-head .verdict { font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.82rem; font-weight: 700; text-align: right; }
+  .verdict.avoid { color: var(--red); }
+  .verdict.clear { color: var(--green); }
+
+  .track {
+    position: relative; height: 38px;
+    background: var(--base); border: 1px solid var(--line);
+    border-radius: 3px; overflow: hidden;
+  }
+  .track .ticks { position: absolute; inset: 0; display: flex; }
+  .track .ticks i { flex: 1; border-right: 1px solid rgba(36,48,56,0.45); }
+  .track .ticks i:last-child { border-right: none; }
+
+  .needbar { position: absolute; top: 0; left: 0; height: 100%; width: 0;
+    transition: width 1.1s cubic-bezier(.2,.8,.2,1); display: flex; align-items: center; }
+  .needbar.danger { background: linear-gradient(90deg, rgba(255,77,94,0.30), rgba(255,77,94,0.55)); border-right: 2px solid var(--red); }
+  .needbar.ok { background: linear-gradient(90deg, rgba(65,224,208,0.18), rgba(65,224,208,0.38)); border-right: 2px solid var(--cyan); }
+  .needbar .blabel { font-family: var(--mono); font-size: 0.68rem; color: var(--text);
+    padding-left: 8px; white-space: nowrap; opacity: 0; transition: opacity 0.4s ease 0.9s; }
+  .needbar.show .blabel { opacity: 1; }
+
+  .gapmark { position: absolute; top: -4px; bottom: -4px; width: 0;
+    border-left: 2px dashed var(--green); opacity: 0; transition: opacity 0.5s ease 0.7s; }
+  .gapmark.show { opacity: 1; }
+  .gapmark .tag { position: absolute; top: -18px; left: 4px;
+    font-family: var(--mono); font-size: 0.62rem; color: var(--green); white-space: nowrap; }
+
+  .gauge-foot { display: flex; flex-wrap: wrap; gap: 1.2rem; margin-top: 0.5rem;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--dim); }
+  .gauge-foot b { color: var(--text); font-weight: 600; }
+
+  /* ── verdict prose ───────────────────────────────────────── */
+  .reason { font-size: 1.06rem; line-height: 1.55; color: var(--text); max-width: 70ch; }
+  .conf-row { display: flex; align-items: center; gap: 1rem; margin: 1.1rem 0 0.4rem; }
+  .conf-meter { flex: 1; max-width: 280px; height: 8px; background: var(--base);
+    border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .conf-meter i { display: block; height: 100%; width: 0; background: var(--cyan); transition: width 1s ease 0.3s; }
+  .conf-label { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
+  .conf-label b { color: var(--cyan); }
+
+  .factors { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+  .factor { font-family: var(--mono); font-size: 0.74rem; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--line); border-left: 2px solid var(--amber);
+    border-radius: 2px; padding: 0.35rem 0.65rem; }
+
+  .override { margin-top: 1.2rem; padding: 0.9rem 1rem; border: 1px solid var(--amber);
+    border-radius: 3px; background: rgba(255,180,61,0.06); }
+  .override .h { font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.18em;
+    font-size: 0.68rem; color: var(--amber); margin-bottom: 0.3rem; }
+  .override .b { font-family: var(--mono); font-size: 0.82rem; color: var(--text); }
+
+  .fallback-flag { display: inline-block; margin-top: 0.8rem; font-family: var(--mono);
+    font-size: 0.74rem; color: var(--amber); border: 1px dashed var(--amber);
+    border-radius: 2px; padding: 0.3rem 0.6rem; }
+
+  .telemetry { display: flex; flex-wrap: wrap; gap: 1.6rem; padding: 0.9rem 1.4rem;
+    background: var(--panel-2); font-family: var(--mono); font-size: 0.74rem; color: var(--dim); }
+  .telemetry .t { display: flex; gap: 0.5rem; }
+  .telemetry .t b { color: var(--cyan); font-weight: 600; }
+
+  .state { text-align: center; padding: 5rem 1rem; color: var(--dim);
+    font-family: var(--disp); text-transform: uppercase; letter-spacing: 0.26em; }
+  .state .big { font-size: 1.4rem; color: var(--text); margin-bottom: 0.6rem; }
+  .state.err .big { color: var(--red); }
+  .state .spin { width: 26px; height: 26px; margin: 0 auto 1.2rem;
+    border: 2px solid var(--line); border-top-color: var(--cyan);
+    border-radius: 50%; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-frame { font-family: var(--mono); font-size: 0.74rem; color: var(--dim);
+    border: 1px dashed var(--line); border-radius: 2px; padding: 0.6rem 0.8rem; display: inline-block; }
+
+  footer.foot { text-align: center; padding: 2rem 1rem 3rem; color: var(--dim);
+    font-family: var(--mono); font-size: 0.72rem; border-top: 1px solid var(--line); }
+  footer.foot a { color: var(--cyan); text-decoration: none; }
+  footer.foot a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    .case-head { grid-template-columns: 1fr; }
+    .verdict-tag { justify-self: start; text-align: left; }
+    table.facts { font-size: 0.76rem; }
+    table.facts th, table.facts td { padding: 0.4rem 0.45rem; }
+    .gauge-head { flex-direction: column; gap: 0.3rem; }
+    .gauge-head .verdict { text-align: left; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="wordmark">EYEWITNESS<span class="dot">.</span></div>
+      <div class="sub">Forensic Collision Analysis</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill" id="status"><span class="led"></span><span id="status-text">UPLINK · BUTTERBASE</span></div>
+    <button class="refresh" id="refresh">Re-scan</button>
+  </header>
+
+  <div class="intro">
+    <div class="eyebrow">Physics-first fault reconstruction</div>
+    <h1>Fault is decided by <span class="accent">physics</span>,<br/>not opinion.</h1>
+    <p class="lede">Each case pairs deterministic computer-vision telemetry with a vision-model verdict. The <strong>avoidability instrument</strong> proves whether a vehicle physically could have stopped — before any AI is consulted.</p>
+    <div class="legend">
+      <span><i style="background:var(--red)"></i> Needed exceeds gap — no safe stop</span>
+      <span><i style="background:var(--cyan)"></i> Needed within gap — had room</span>
+      <span><i style="background:var(--green)"></i> Gap available</span>
+    </div>
+  </div>
+
+  <main id="main">
+    <div class="state" id="loading">
+      <div class="spin"></div>
+      <div class="big">Establishing uplink</div>
+      <div>Retrieving telemetry from Butterbase…</div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    EYEWITNESS · evidence trail served from Butterbase ·
+    <a href="https://github.com/harsh543/eyewitness" target="_blank" rel="noopener">source</a>
+  </footer>
+
+<script>
+const API = "https://api.butterbase.ai/v1/app_46yxrt8czo59/fn/get_runs";
+
+const num = (v, d = 1) => (v === null || v === undefined || isNaN(v)) ? "—" : Number(v).toFixed(d);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function setStatus(ok, text) {
+  document.getElementById("status").classList.toggle("err", !ok);
+  document.getElementById("status-text").textContent = text;
+}
+
+function gauge(av, sharedMax) {
+  const needed = Number(av.total_needed_m) || 0;
+  const gap    = Number(av.available_gap_m) || 0;
+  const avoidable = !!av.avoidable;            // true = had room = AT FAULT
+  const needPct = Math.min(100, (needed / sharedMax) * 100);
+  const gapPct  = Math.min(100, (gap / sharedMax) * 100);
+
+  const verdictTxt = avoidable ? "✅ AVOIDABLE — HAD ROOM TO STOP" : "⛔ UNAVOIDABLE — NO SAFE STOP EXISTED";
+  const verdictCls = avoidable ? "avoid" : "clear";
+  const barCls     = avoidable ? "ok" : "danger";
+
+  return `
+  <div class="gauge" data-need="${needPct}" data-gap="${gapPct}">
+    <div class="gauge-head">
+      <div class="who">Vehicle <b>#${esc(av.vehicle_id)}</b> · ${num(av.speed_kph)} km/h</div>
+      <div class="verdict ${verdictCls}">${verdictTxt}</div>
+    </div>
+    <div class="track">
+      <div class="ticks">${"<i></i>".repeat(10)}</div>
+      <div class="needbar ${barCls}"><span class="blabel">NEEDED ${num(needed)} m</span></div>
+      <div class="gapmark"><span class="tag">GAP ${num(gap)} m</span></div>
+    </div>
+    <div class="gauge-foot">
+      <span>REACTION <b>${num(av.react_dist_m)} m</b></span>
+      <span>BRAKING <b>${num(av.stop_dist_m)} m</b></span>
+      <span>REQUIRED <b>${num(needed)} m</b></span>
+      <span>AVAILABLE <b>${num(gap)} m</b></span>
+    </div>
+  </div>`;
+}
+
+function factsTable(facts) {
+  const rows = facts.map(f => `
+    <tr>
+      <td class="vid">#${esc(f.vehicle_id)}</td>
+      <td>${num(f.speed_kph_est)} km/h</td>
+      <td>${num(f.heading_deg, 0)}°</td>
+      <td>${f.ttc_ms == null ? "—" : num(f.ttc_ms,0)+" ms"}</td>
+      <td><span class="chip-bool ${f.had_safe_stop ? "yes":"no"}">${f.had_safe_stop ? "YES":"NO"}</span></td>
+    </tr>`).join("");
+  return `<table class="facts">
+    <thead><tr><th>Track</th><th>Speed</th><th>Heading</th><th>Time-to-impact</th><th>Braked?</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function casePanel(run) {
+  const sev = (run.fault && run.fault.severity ? run.fault.severity : "unknown").toLowerCase();
+  const faultId = run.fault ? run.fault.fault_vehicle_id : null;
+  const conf = run.fault ? run.fault.confidence : null;
+  const verdictVal = faultId != null ? `FAULT · VEHICLE #${esc(faultId)}` : "FAULT · SHARED";
+
+  const vals = (run.avoidability || []).flatMap(a => [Number(a.total_needed_m)||0, Number(a.available_gap_m)||0]);
+  const sharedMax = Math.max(1, ...vals) * 1.12;
+  const gauges = (run.avoidability || []).map(a => gauge(a, sharedMax)).join("");
+
+  const factors = ((run.fault && run.fault.contributing_factors) || []).map(f => `<span class="factor">${esc(f)}</span>`).join("");
+
+  const override = (run.fault_history || []).find(h => h.override_reason);
+  const overrideHTML = override ? `
+    <div class="override">
+      <div class="h">Human override · evidence preserved</div>
+      <div class="b">${esc(override.override_reason)}</div>
+    </div>` : "";
+
+  const fallbackHTML = (run.fault && run.fault.fallback_used)
+    ? `<div class="fallback-flag">⚠ VLM fallback — verdict derived from physics only</div>` : "";
+
+  const ts = run.created_at ? new Date(run.created_at).toISOString().replace("T"," ").slice(0,19)+" UTC" : "—";
+  const m = run.monitoring || {};
+
+  return `
+  <article class="case sev-${sev}">
+    <div class="case-head">
+      <div class="case-meta">
+        <div class="field"><span class="k">Case</span><span class="v">${esc((run.run_id||"").slice(0,8))}</span></div>
+        <div class="field"><span class="k">Source</span><span class="v">${esc(run.clip_filename||"—")}</span></div>
+        <div class="field"><span class="k">Logged</span><span class="v">${esc(ts)}</span></div>
+        <div class="field"><span class="k">Status</span><span class="v">${esc((run.status||"—").toUpperCase())}</span></div>
+      </div>
+      <div class="verdict-tag">
+        <div class="label">Verdict</div>
+        <div class="val">${verdictVal}</div>
+        <div class="meta">${esc(sev.toUpperCase())} · ${conf==null?"—":Math.round(conf*100)+"% confidence"}</div>
+      </div>
+    </div>
+
+    <section class="evi">
+      <div class="sec-label"><span class="num">01</span> Facts · CV telemetry <span class="rule"></span></div>
+      ${run.facts && run.facts.length ? factsTable(run.facts) : '<div class="empty-frame">No tracked vehicles.</div>'}
+    </section>
+
+    <section class="evi">
+      <div class="sec-label"><span class="num">02</span> Avoidability · Field of safe motion <span class="rule"></span></div>
+      ${gauges || '<div class="empty-frame">No avoidability data.</div>'}
+    </section>
+
+    <section class="evi">
+      <div class="sec-label"><span class="num">03</span> Verdict · Vision-model corroboration <span class="rule"></span></div>
+      ${run.fault ? `
+        <p class="reason">${esc(run.fault.fault_reason)}</p>
+        <div class="conf-row">
+          <span class="conf-label">CONFIDENCE</span>
+          <div class="conf-meter"><i data-conf="${conf!=null?Math.round(conf*100):0}"></i></div>
+          <span class="conf-label"><b>${conf==null?"—":Math.round(conf*100)+"%"}</b></span>
+        </div>
+        <div class="factors">${factors}</div>
+        ${fallbackHTML}
+        ${overrideHTML}
+      ` : '<div class="empty-frame">Verdict pending.</div>'}
+    </section>
+
+    <div class="telemetry">
+      <span class="t">LATENCY <b>${m.total_latency_ms!=null?m.total_latency_ms+" ms":"—"}</b></span>
+      <span class="t">TOKENS <b>${(m.input_tokens||0)+(m.output_tokens||0)}</b></span>
+      <span class="t">COST <b>${m.cost_usd!=null?"$"+Number(m.cost_usd).toFixed(5):"—"}</b></span>
+      <span class="t">VEHICLES <b>${m.vehicle_count != null ? m.vehicle_count : "—"}</b></span>
+      <span class="t">AVOIDABLE <b>${m.avoidable_count != null ? m.avoidable_count : "—"}</b></span>
+      <span class="t">MODEL <b>${esc(run.model_version||"—")}</b></span>
+    </div>
+  </article>`;
+}
+
+function animate() {
+  document.querySelectorAll(".gauge").forEach(g => {
+    const need = g.getAttribute("data-need");
+    const gap  = g.getAttribute("data-gap");
+    const bar  = g.querySelector(".needbar");
+    const mark = g.querySelector(".gapmark");
+    requestAnimationFrame(() => {
+      bar.style.width = need + "%";
+      bar.classList.add("show");
+      mark.style.left = gap + "%";
+      mark.classList.add("show");
+    });
+  });
+  document.querySelectorAll(".conf-meter i").forEach(i => {
+    requestAnimationFrame(() => { i.style.width = i.getAttribute("data-conf") + "%"; });
+  });
+}
+
+async function load() {
+  const main = document.getElementById("main");
+  const btn = document.getElementById("refresh");
+  btn.disabled = true;
+  setStatus(true, "SCANNING…");
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const runs = data.runs || [];
+    if (!runs.length) {
+      main.innerHTML = `<div class="state"><div class="big">No cases on record</div><div>Run the pipeline on a clip to log evidence.</div></div>`;
+      setStatus(true, "UPLINK · IDLE");
+    } else {
+      main.innerHTML = runs.map(casePanel).join("");
+      animate();
+      setStatus(true, runs.length + " CASE" + (runs.length>1?"S":"") + " · LIVE");
+    }
+  } catch (e) {
+    main.innerHTML = `<div class="state err"><div class="big">No telemetry</div><div>Backend unreachable — ${esc(e.message)}</div></div>`;
+    setStatus(false, "UPLINK LOST");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("refresh").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>

@@ -71,6 +71,21 @@ class ButterbaseClient:
             "frame_idx":          fact.frame_idx,
         }) is not None
 
+    # ── avoidability ─────────────────────────────────────────────────────────────
+
+    def insert_avoidability(self, run_id: str, model_version: str, a: AvoidabilityResult) -> bool:
+        return self._post("avoidability", {
+            "run_id":          run_id,
+            "model_version":   model_version,
+            "vehicle_id":      a.vehicle_id,
+            "speed_kph":       a.speed_kph,
+            "react_dist_m":    a.react_dist_m,
+            "stop_dist_m":     a.stop_dist_m,
+            "total_needed_m":  a.total_needed_m,
+            "available_gap_m": a.available_gap_m,
+            "avoidable":       a.avoidable,
+        }) is not None
+
     # ── frames ─────────────────────────────────────────────────────────────────
 
     def insert_frame(self, run_id: str, model_version: str, kf: KeyFrame) -> bool:

@@ -25,10 +25,14 @@ def _get_model() -> YOLO:
     return _model
 
 
-def analyze_clip(video_path: str) -> AnalysisResult:
+def analyze_clip(video_path: str, persist_sync: bool = False) -> AnalysisResult:
     """
-    Full pipeline: CV + avoidability → VLM → async persist + monitor.
+    Full pipeline: CV + avoidability → VLM → persist + monitor.
     Returns AnalysisResult; result.error is set (not raised) on stage failure.
+
+    persist_sync=True blocks until all Butterbase writes complete (use for CLI
+    demos so evidence is guaranteed in the DB before the process exits).
+    persist_sync=False fires writes in a daemon thread (use for the Gradio app).
     """
     result = AnalysisResult(clip_filename=os.path.basename(video_path))
     mon    = RunMonitor(result.run_id, result.model_version)
@@ -68,8 +72,11 @@ def analyze_clip(video_path: str) -> AnalysisResult:
         except Exception as exc:
             result.error = f"VLM stage: {exc}"
 
-    # ── stage 3: persist (non-blocking) ──────────────────────────────────────
-    threading.Thread(target=_persist, args=(result, mon), daemon=True).start()
+    # ── stage 3: persist ─────────────────────────────────────────────────────
+    if persist_sync:
+        _persist(result, mon)                                    # block until written
+    else:
+        threading.Thread(target=_persist, args=(result, mon), daemon=True).start()
 
     return result
 
@@ -79,6 +86,8 @@ def _persist(result: AnalysisResult, mon: RunMonitor) -> None:
     bb.insert_claim(result.run_id, result.model_version, result.clip_filename)
     for fact in result.vehicle_facts:
         bb.insert_fact(result.run_id, result.model_version, fact)
+    for a in result.avoidability:
+        bb.insert_avoidability(result.run_id, result.model_version, a)
     for kf in result.keyframes:
         bb.insert_frame(result.run_id, result.model_version, kf)
     if result.hypothesis:
